@@ -25,6 +25,7 @@ import {
   useCameraPerformance,
   useAlertTrends,
   useAlertCategoryStats,
+  useHourlyActivity,
 } from "../hooks/react-query-hooks";
 
 const RANGE_DAY_MAP = {
@@ -88,6 +89,11 @@ export function StatisticalAnalysis() {
     isLoading: alertCategoryLoading,
     isError: alertCategoryError,
   } = useAlertCategoryStats({ days: selectedDays, limit: 4 });
+  const {
+    data: hourlyActivityData,
+    isLoading: hourlyActivityLoading,
+    isError: hourlyActivityError,
+  } = useHourlyActivity({ hours: 24 });
 
   const formatChartDate = (value: string) => {
     const parsed = new Date(value);
@@ -108,54 +114,21 @@ export function StatisticalAnalysis() {
     (max, item) => Math.max(max, item.count),
     0
   );
+  const hourlyActivity = hourlyActivityData?.data ?? [];
+  const hourlySummary = hourlyActivityData?.summary;
 
+  const formatHourlyLabel = (hour?: string | null, count?: number) => {
+    if (!hour) return "-";
+    const countText = typeof count === "number" ? ` (${count} 次)` : "";
+    return `${hour}${countText}`;
+  };
 
-  // 模擬統計數據
-  const dailyDetections = [
-    { date: "01/01", person: 145, vehicle: 89, total: 234 },
-    { date: "01/02", person: 162, vehicle: 93, total: 255 },
-    { date: "01/03", person: 178, vehicle: 85, total: 263 },
-    { date: "01/04", person: 155, vehicle: 91, total: 246 },
-    { date: "01/05", person: 189, vehicle: 97, total: 286 },
-    { date: "01/06", person: 203, vehicle: 102, total: 305 },
-    { date: "01/07", person: 195, vehicle: 88, total: 283 },
-  ];
-
-  const hourlyActivity = [
-    { hour: "00", count: 12 },
-    { hour: "01", count: 8 },
-    { hour: "02", count: 5 },
-    { hour: "03", count: 3 },
-    { hour: "04", count: 7 },
-    { hour: "05", count: 15 },
-    { hour: "06", count: 25 },
-    { hour: "07", count: 45 },
-    { hour: "08", count: 67 },
-    { hour: "09", count: 82 },
-    { hour: "10", count: 95 },
-    { hour: "11", count: 88 },
-    { hour: "12", count: 102 },
-    { hour: "13", count: 94 },
-    { hour: "14", count: 89 },
-    { hour: "15", count: 76 },
-    { hour: "16", count: 85 },
-    { hour: "17", count: 98 },
-    { hour: "18", count: 112 },
-    { hour: "19", count: 89 },
-    { hour: "20", count: 67 },
-    { hour: "21", count: 45 },
-    { hour: "22", count: 32 },
-    { hour: "23", count: 18 },
-  ];
-
-  const detectionTypes = [
-    { name: "人員", value: 1245, color: "#8884d8" },
-    { name: "車輛", value: 632, color: "#82ca9d" },
-    { name: "自行車", value: 189, color: "#ffc658" },
-    { name: "其他", value: 94, color: "#ff7c7c" },
-  ];
-
-  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7c7c"];
+  const formatAverageLabel = (value?: number) => {
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      return "-";
+    }
+    return `${value.toFixed(1)} 次`;
+  };
 
   return (
     <div className="space-y-6">
@@ -356,36 +329,63 @@ export function StatisticalAnalysis() {
               <CardTitle>24小時活動分析</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={hourlyActivity}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="hour" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#8884d8"
-                    strokeWidth={2}
-                    dot={{ fill: "#8884d8" }}
-                    name="偵測次數"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">高峰時段</p>
-                  <p className="text-lg">18:00 - 19:00</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">低峰時段</p>
-                  <p className="text-lg">03:00 - 04:00</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">平均每小時</p>
-                  <p className="text-lg">58 次</p>
-                </div>
-              </div>
+              {hourlyActivityLoading && (
+                <p className="text-sm text-muted-foreground">載入活動分析中...</p>
+              )}
+              {hourlyActivityError && (
+                <p className="text-sm text-destructive">無法取得活動分析資料</p>
+              )}
+              {!hourlyActivityLoading && !hourlyActivityError && hourlyActivity.length === 0 && (
+                <p className="text-sm text-muted-foreground">過去24小時沒有偵測紀錄。</p>
+              )}
+              {!hourlyActivityLoading &&
+                !hourlyActivityError &&
+                hourlyActivity.length > 0 && (
+                  <>
+                    <ResponsiveContainer width="100%" height={400}>
+                      <LineChart data={hourlyActivity}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="hour" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#8884d8"
+                          strokeWidth={2}
+                          dot={{ fill: "#8884d8" }}
+                          name="偵測次數"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <div className="mt-4 grid gap-4 md:grid-cols-3">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">高峰時段</p>
+                        <p className="text-lg">
+                          {formatHourlyLabel(
+                            hourlySummary?.peak_hour,
+                            hourlySummary?.peak_count
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">低峰時段</p>
+                        <p className="text-lg">
+                          {formatHourlyLabel(
+                            hourlySummary?.low_hour,
+                            hourlySummary?.low_count
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">平均每小時</p>
+                        <p className="text-lg">
+                          {formatAverageLabel(hourlySummary?.average_per_hour)}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
             </CardContent>
           </Card>
         </TabsContent>

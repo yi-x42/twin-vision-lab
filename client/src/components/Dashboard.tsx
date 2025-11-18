@@ -22,6 +22,17 @@ import {
 } from "../hooks/react-query-hooks";
 import { Skeleton } from "./ui/skeleton";
 
+const alertTimeFormatter = new Intl.DateTimeFormat("zh-TW", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Taipei",
+});
+
 export function Dashboard() {
   const { data: systemStats, isLoading, isError, error } = useSystemStats();
   const { data: camerasData, isLoading: camerasLoading, error: camerasError } = useCameras();
@@ -65,7 +76,7 @@ export function Dashboard() {
     if (Number.isNaN(parsed.getTime())) {
       return value;
     }
-    return parsed.toLocaleString();
+    return alertTimeFormatter.format(parsed);
   };
 
   const getSeverityBadgeVariant = (severity?: string | null) => {

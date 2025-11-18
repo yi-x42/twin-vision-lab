@@ -10,6 +10,7 @@ import time
 import base64
 import tempfile
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union, Literal, Iterable
 import subprocess
@@ -66,6 +67,24 @@ router = APIRouter(prefix="/frontend", tags=["前端界面"])
 UPLOADS_ROOT = get_base_dir() / "uploads"
 ALERT_SNAPSHOT_DIR = UPLOADS_ROOT / "alerts" / "snapshots"
 SNAPSHOT_SUFFIXES = {".jpg", ".jpeg", ".png"}
+
+def _resolve_timezone(name: Optional[str], fallback: str) -> ZoneInfo:
+    try:
+        if name:
+            return ZoneInfo(name)
+    except Exception:  # noqa: BLE001
+        api_logger.warning(f"無法載入時區 {name}，改用 {fallback}")
+    try:
+        return ZoneInfo(fallback)
+    except Exception:  # noqa: BLE001
+        api_logger.warning(f"無法載入備援時區 {fallback}，使用 UTC")
+        return ZoneInfo("UTC")
+
+ALERT_SOURCE_TZ = _resolve_timezone(getattr(settings, "alert_source_timezone", "UTC"), "UTC")
+ALERT_DISPLAY_TZ = _resolve_timezone(
+    getattr(settings, "alert_display_timezone", None) or getattr(settings, "app_timezone", "Asia/Taipei"),
+    "UTC",
+)
 
 ALERT_TYPE_LABELS = {
     "linecrossing": "越線警報",
@@ -551,6 +570,18 @@ def _normalize_datetime_input(value: Optional[datetime]) -> Optional[datetime]:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
+
+def _convert_alert_timestamp(value: Optional[datetime]) -> Optional[datetime]:
+    """將警報時間轉換為顯示用時區。"""
+    if value is None:
+        return None
+    base = value
+    if base.tzinfo is None:
+        base = base.replace(tzinfo=ALERT_SOURCE_TZ)
+    else:
+        base = base.astimezone(ALERT_SOURCE_TZ)
+    return base.astimezone(ALERT_DISPLAY_TZ)
+
 # ===== 工具函數 =====
 
 def get_ethernet_speed() -> float:
@@ -921,6 +952,24 @@ class AlertCategoryStat(BaseModel):
     rule_type: str = Field(..., description="警報規則類型")
     label: str = Field(..., description="顯示名稱")
     count: int = Field(0, ge=0, description="指定期間內的警報次數")
+
+
+class HourlyActivityPoint(BaseModel):
+    hour: str = Field(..., description="時間點 (例如 05/17 13:00)")
+    count: int = Field(0, ge=0, description="該時段的偵測次數")
+
+
+class HourlyActivitySummary(BaseModel):
+    peak_hour: Optional[str] = Field(None, description="偵測量最高的時段")
+    peak_count: int = Field(0, ge=0, description="高峰時段的偵測次數")
+    low_hour: Optional[str] = Field(None, description="偵測量最低的時段")
+    low_count: int = Field(0, ge=0, description="低峰時段的偵測次數")
+    average_per_hour: float = Field(0.0, ge=0.0, description="每小時平均偵測次數")
+
+
+class HourlyActivityResponse(BaseModel):
+    data: List[HourlyActivityPoint]
+    summary: HourlyActivitySummary
 
 # ===== 資料來源管理模型 =====
 
@@ -1330,12 +1379,13 @@ async def list_active_alerts_api(
                 continue
             mtime = file_path.stat().st_mtime
             triggered_at = _parse_snapshot_timestamp(timestamp_raw, mtime)
+            display_timestamp = _convert_alert_timestamp(triggered_at) or triggered_at
             events.append(
                 {
                     "task_id": dir_path.name,
                     "file_name": file_path.name,
                     "path": file_path,
-                    "timestamp": triggered_at,
+                    "timestamp": display_timestamp,
                     "rule_id": rule_id,
                 }
             )
@@ -2743,6 +2793,83 @@ async def get_alert_category_stats(
     stats = [AlertCategoryStat(**payload) for payload in aggregates.values()]
     stats.sort(key=lambda item: item.count, reverse=True)
     return stats[:limit]
+
+
+@router.get(
+    "/analytics/hourly-activity",
+    response_model=HourlyActivityResponse,
+)
+async def get_hourly_activity(
+    hours: int = Query(24, ge=1, le=168, description="統計最近幾小時的偵測活動"),
+    db: AsyncSession = Depends(get_db),
+):
+    """取得指定期間內每小時的偵測量，供前端 24 小時活動圖表使用。"""
+    try:
+        now = datetime.utcnow()
+        current_hour = now.replace(minute=0, second=0, microsecond=0)
+        window_hours = max(1, min(hours, 168))
+        start_hour = current_hour - timedelta(hours=window_hours - 1)
+        end_boundary = current_hour + timedelta(hours=1)
+
+        hour_bucket = func.date_trunc("hour", DetectionResult.frame_timestamp).label("hour_bucket")
+        count_expr = func.count(DetectionResult.id).label("count")
+
+        stmt = (
+            select(hour_bucket, count_expr)
+            .where(
+                DetectionResult.frame_timestamp >= start_hour,
+                DetectionResult.frame_timestamp < end_boundary,
+            )
+            .group_by(hour_bucket)
+            .order_by(hour_bucket)
+        )
+
+        result = await db.execute(stmt)
+        aggregated: Dict[datetime, int] = {}
+        for row in result.all():
+            bucket_time = getattr(row, "hour_bucket", None)
+            if bucket_time is None:
+                continue
+            if bucket_time.tzinfo is not None:
+                bucket_time = bucket_time.replace(tzinfo=None)
+            aggregated[bucket_time] = int(getattr(row, "count", 0) or 0)
+
+        data_points: List[HourlyActivityPoint] = []
+        total_count = 0
+        for idx in range(window_hours):
+            bucket_time = start_hour + timedelta(hours=idx)
+            count = aggregated.get(bucket_time, 0)
+            total_count += count
+            label = bucket_time.strftime("%m/%d %H:00")
+            data_points.append(HourlyActivityPoint(hour=label, count=count))
+
+        has_activity = any(point.count > 0 for point in data_points)
+        average = round(total_count / len(data_points), 2) if data_points else 0.0
+
+        if has_activity:
+            peak_point = max(data_points, key=lambda item: item.count)
+            low_point = min(data_points, key=lambda item: item.count)
+            summary = HourlyActivitySummary(
+                peak_hour=peak_point.hour,
+                peak_count=peak_point.count,
+                low_hour=low_point.hour,
+                low_count=low_point.count,
+                average_per_hour=average,
+            )
+        else:
+            summary = HourlyActivitySummary(
+                peak_hour=None,
+                peak_count=0,
+                low_hour=None,
+                low_count=0,
+                average_per_hour=average,
+            )
+
+        return HourlyActivityResponse(data=data_points, summary=summary)
+
+    except Exception as exc:
+        api_logger.error(f"獲取小時活動數據失敗: {exc}")
+        raise HTTPException(status_code=500, detail="無法取得小時活動數據")
 
 
 @router.get("/analytics", response_model=AnalyticsData)

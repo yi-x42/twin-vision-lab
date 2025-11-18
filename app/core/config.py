@@ -141,6 +141,13 @@ class Settings:
         self.redis_password = os.getenv("REDIS_PASSWORD")
         self.redis_db = int(os.getenv("REDIS_DB", "0"))
 
+        # 時區設定
+        self.alert_source_timezone = os.getenv("ALERT_SOURCE_TIMEZONE", "UTC")
+        self.alert_display_timezone = os.getenv(
+            "ALERT_DISPLAY_TIMEZONE",
+            os.getenv("APP_TIMEZONE", "Asia/Taipei"),
+        )
+
         # 安全
         self.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
         self.algorithm = "HS256"

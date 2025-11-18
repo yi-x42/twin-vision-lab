@@ -139,6 +139,50 @@ export const useAlertCategoryStats = (
   });
 };
 
+export interface HourlyActivityPoint {
+  hour: string;
+  count: number;
+}
+
+export interface HourlyActivitySummary {
+  peak_hour: string | null;
+  peak_count: number;
+  low_hour: string | null;
+  low_count: number;
+  average_per_hour: number;
+}
+
+export interface HourlyActivityResponse {
+  data: HourlyActivityPoint[];
+  summary: HourlyActivitySummary;
+}
+
+interface HourlyActivityParams {
+  hours?: number;
+}
+
+const fetchHourlyActivity = async (
+  params: HourlyActivityParams
+): Promise<HourlyActivityResponse> => {
+  const { data } = await apiClient.get('/frontend/analytics/hourly-activity', {
+    params,
+  });
+  return data;
+};
+
+export const useHourlyActivity = (
+  { hours = 24 }: HourlyActivityParams = {}
+) => {
+  return useQuery<HourlyActivityResponse, Error>({
+    queryKey: ['hourlyActivity', hours],
+    queryFn: () => fetchHourlyActivity({ hours }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: false,
+  });
+};
+
 // 郵件通知設定
 export interface EmailNotificationSettings {
   enabled: boolean;
