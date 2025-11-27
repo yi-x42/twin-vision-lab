@@ -1834,7 +1834,7 @@ async def start_realtime_analysis(
                 source_width=camera_width,
                 source_height=camera_height,
                 source_fps=camera_fps,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(),
                 task_name=request.task_name,
                 model_id=request.model_id,
                 confidence_threshold=request.confidence
@@ -1897,7 +1897,7 @@ async def start_realtime_analysis(
             fall_detection_service.stop_monitoring(str(task_id))
 
         analysis_task.status = "running"
-        analysis_task.start_time = datetime.utcnow()
+        analysis_task.start_time = datetime.now()
         await db.commit()
 
         api_logger.info(f"即時分析任務 {task_id} 已啟動")
@@ -1918,7 +1918,7 @@ async def start_realtime_analysis(
                 "confidence": request.confidence,
                 "iou_threshold": request.iou_threshold,
             },
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(),
             websocket_url=None,
             client_stream=False,
         )
@@ -2332,7 +2332,7 @@ async def check_camera_status(camera_id: int):
         return {
             "camera_id": camera_id,
             "status": status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "message": f"攝影機狀態: {status}"
         }
         
@@ -2354,7 +2354,7 @@ async def check_all_cameras_status():
         
         return {
             "message": f"已檢查 {len(results)} 個攝影機的狀態",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "results": results
         }
         
@@ -2585,7 +2585,7 @@ async def get_camera_performance(
 ):
     """依據歷史偵測結果與任務資料輸出攝影機效能指標"""
     try:
-        now = datetime.utcnow()
+        now = datetime.now()
         start_time = now - timedelta(days=days)
 
         detection_stmt = (
@@ -2719,7 +2719,7 @@ async def get_alert_trends(
     task_id: Optional[str] = Query(None, description="僅統計指定任務的警報"),
 ):
     """由快照檔案彙整警報趨勢資料。"""
-    now = datetime.utcnow()
+    now = datetime.now()
     effective_days = max(1, min(days, 90))
     start_date = (now - timedelta(days=effective_days - 1)).date()
     start_boundary = datetime.combine(start_date, datetime.min.time())
@@ -2761,7 +2761,7 @@ async def get_alert_category_stats(
     limit: int = Query(4, ge=1, le=20, description="最多顯示的類別數"),
     task_id: Optional[str] = Query(None, description="僅統計指定任務的警報"),
 ):
-    now = datetime.utcnow()
+    now = datetime.now()
     effective_days = max(1, min(days, 90))
     start_date = (now - timedelta(days=effective_days - 1)).date()
     start_boundary = datetime.combine(start_date, datetime.min.time())
@@ -2805,7 +2805,7 @@ async def get_hourly_activity(
 ):
     """取得指定期間內每小時的偵測量，供前端 24 小時活動圖表使用。"""
     try:
-        now = datetime.utcnow()
+        now = datetime.now()
         current_hour = now.replace(minute=0, second=0, microsecond=0)
         window_hours = max(1, min(hours, 168))
         start_hour = current_hour - timedelta(hours=window_hours - 1)
@@ -3532,7 +3532,7 @@ async def update_data_source(
             update_dict["config"] = update_data.config
         if update_data.status is not None:
             update_dict["status"] = update_data.status
-            update_dict["last_check"] = datetime.utcnow()
+            update_dict["last_check"] = datetime.now()
         
         # 執行更新
         from sqlalchemy import update
@@ -4819,9 +4819,9 @@ async def run_realtime_detection(
                 if task:
                     task.status = status
                     if status == "running" and not task.start_time:
-                        task.start_time = datetime.utcnow()
+                        task.start_time = datetime.now()
                     elif status in ["completed", "failed"]:
-                        task.end_time = datetime.utcnow()
+                        task.end_time = datetime.now()
                         
                     await db.commit()
                     api_logger.info(f"任務 {task_id} 狀態更新為: {status}")
@@ -5014,7 +5014,7 @@ async def stop_live_person_camera(task_id: int, db: AsyncSession = Depends(get_d
         await db.execute(
             update(AnalysisTask)
             .where(AnalysisTask.id == int(task_id))
-            .values(status="stopped", end_time=datetime.utcnow())
+            .values(status="stopped", end_time=datetime.now())
         )
         await db.commit()
 

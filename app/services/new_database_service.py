@@ -5,7 +5,7 @@
 
 import threading
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update, delete, func, and_, or_
 from sqlalchemy.orm import selectinload
@@ -21,6 +21,22 @@ class DatabaseService:
     
     def __init__(self, db_session: AsyncSession = None):
         self.db = db_session
+        # 將本地時區緩存起來，後續統一轉成 UTC 再寫入資料庫
+        self._local_tz = datetime.now().astimezone().tzinfo or timezone.utc
+
+    def _normalize_timestamp(self, value: Any) -> datetime:
+        """確保時間戳含有時區並轉成 UTC，避免 DB 預設 UTC 時造成 8 小時偏移"""
+        try:
+            if value is None:
+                return datetime.now(timezone.utc)
+            if isinstance(value, str):
+                value = datetime.fromisoformat(value)
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=self._local_tz)
+            return value.astimezone(timezone.utc)
+        except Exception as e:
+            db_logger.warning(f"時間戳正規化失敗，改用當前 UTC 時間: {e}")
+            return datetime.now(timezone.utc)
     
     # ============================================================================
     # 分析任務相關操作
@@ -35,7 +51,7 @@ class DatabaseService:
             source_width=task_data.get('source_width'),
             source_height=task_data.get('source_height'),
             source_fps=task_data.get('source_fps'),
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             task_name=task_data.get('task_name'),
             model_id=task_data.get('model_id'),
             confidence_threshold=task_data.get('confidence_threshold', 0.5)
@@ -53,7 +69,7 @@ class DatabaseService:
                 .where(AnalysisTask.id == task_id)
                 .values(
                     status='running',
-                    start_time=datetime.utcnow()
+                    start_time=datetime.now(timezone.utc)
                 )
             )
             await session.commit()
@@ -70,7 +86,7 @@ class DatabaseService:
                 .where(AnalysisTask.id == task_id)
                 .values(
                     status=status,
-                    end_time=datetime.utcnow()
+                    end_time=datetime.now(timezone.utc)
                 )
             )
             await session.commit()
@@ -85,9 +101,9 @@ class DatabaseService:
             # 根據狀態決定是否更新結束時間
             values = {'status': status}
             if status in ['completed', 'failed', 'cancelled']:
-                values['end_time'] = datetime.utcnow()
+                values['end_time'] = datetime.now(timezone.utc)
             elif status == 'running':
-                values['start_time'] = datetime.utcnow()
+                values['start_time'] = datetime.now(timezone.utc)
             
             result = await db.execute(
                 update(AnalysisTask)
@@ -171,10 +187,11 @@ class DatabaseService:
     async def save_detection_result(self, session: AsyncSession, detection_data: Dict[str, Any]) -> DetectionResult:
         """儲存單個檢測結果"""
         try:
+            frame_timestamp = self._normalize_timestamp(detection_data.get('frame_timestamp'))
             detection_obj = DetectionResult(
                 task_id=detection_data['task_id'],
                 frame_number=detection_data['frame_number'],
-                frame_timestamp=detection_data.get('frame_timestamp', datetime.utcnow()),
+                frame_timestamp=frame_timestamp,
                 object_type=detection_data['object_type'],
                 confidence=detection_data['confidence'],
                 bbox_x1=detection_data['bbox_x1'],
@@ -203,10 +220,11 @@ class DatabaseService:
         try:
             detection_objects = []
             for detection in detections:
+                frame_timestamp = self._normalize_timestamp(detection.get('frame_timestamp'))
                 detection_obj = DetectionResult(
                     task_id=task_id,
                     frame_number=detection['frame_number'],
-                    frame_timestamp=detection.get('frame_timestamp', datetime.utcnow()),
+                    frame_timestamp=frame_timestamp,
                     object_type=detection['object_type'],
                     confidence=detection['confidence'],
                     bbox_x1=detection['bbox_x1'],
@@ -284,7 +302,7 @@ class DatabaseService:
     
     async def cleanup_old_detections(self, session: AsyncSession, days: int = 7) -> int:
         """清理舊的檢測結果（用於即時攝影機資料）"""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         
         # 只清理即時攝影機的檢測結果
         subquery = select(AnalysisTask.id).where(
@@ -316,7 +334,7 @@ class DatabaseService:
             name=source_data['name'],
             config=source_data.get('config'),
             status=source_data.get('status', 'active'),
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         session.add(source)
         await session.commit()
@@ -356,7 +374,7 @@ class DatabaseService:
                 .where(DataSource.id == source_id)
                 .values(
                     status=status,
-                    last_check=datetime.utcnow()
+                    last_check=datetime.now(timezone.utc)
                 )
             )
             await session.commit()
@@ -417,7 +435,7 @@ class DatabaseService:
                         config_value=value,
                         description=description or config.description,
                         name=description or config.name,
-                        updated_at=datetime.utcnow()
+                        updated_at=datetime.now(timezone.utc)
                     )
                 )
             else:
@@ -428,7 +446,7 @@ class DatabaseService:
                     config_value=value,
                     name=description,
                     description=description,
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.now(timezone.utc)
                 )
                 session.add(new_config)
             
@@ -478,7 +496,7 @@ class DatabaseService:
         # 最近24小時檢測統計
         recent_detections = await session.execute(
             select(func.count(DetectionResult.id))
-            .where(DetectionResult.frame_timestamp >= datetime.utcnow() - timedelta(days=1))
+            .where(DetectionResult.frame_timestamp >= datetime.now(timezone.utc) - timedelta(days=1))
         )
         
         return {
@@ -552,10 +570,12 @@ class DatabaseService:
                          :bbox_x1, :bbox_y1, :bbox_x2, :bbox_y2, :center_x, :center_y, :thumbnail_path)
                     """)
                     
+                    frame_timestamp = self._normalize_timestamp(detection_data['frame_timestamp'])
+                    
                     params = {
                         'task_id': int(detection_data['task_id']),
                         'frame_number': int(detection_data['frame_number']),
-                        'frame_timestamp': detection_data['frame_timestamp'],
+                        'frame_timestamp': frame_timestamp,
                         'object_type': str(detection_data['object_type']),
                         'confidence': float(detection_data['confidence']),
                         'bbox_x1': float(detection_data['bbox_x1']),
