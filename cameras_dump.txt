@@ -1,0 +1,4 @@
+ID    | Name                 | Config                                            
+--------------------------------------------------------------------------------
+16    | USB Camera 0         | {'fps': 30, 'resolution': '640x480', 'device_index': 0}
+17    | USB Camera 1         | {'fps': 30, 'resolution': '1280x720', 'device_index': 1}

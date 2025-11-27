@@ -80,7 +80,14 @@ const formatDateTime = (value?: string | null) => {
   if (!value) {
     return "--";
   }
-  const date = new Date(value);
+
+  // 如果時間字串沒有時區資訊（沒有 Z 或 +），則視為 UTC
+  let dateStr = value;
+  if (!dateStr.endsWith("Z") && !dateStr.includes("+")) {
+    dateStr += "Z";
+  }
+
+  const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -640,7 +647,7 @@ export function RecordQuery() {
                       </PaginationItem>
                       {paginationIndicators.map((indicator, index) =>
                         indicator === "ellipsis-left" ||
-                        indicator === "ellipsis-right" ? (
+                          indicator === "ellipsis-right" ? (
                           <PaginationItem key={`${indicator}-${index}`}>
                             <PaginationEllipsis />
                           </PaginationItem>

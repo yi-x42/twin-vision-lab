@@ -115,6 +115,23 @@ const toOptionalNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const formatUTCTime = (timeStr: string | null | undefined): string => {
+  if (!timeStr) return "未開始";
+
+  // 如果時間字串沒有時區資訊（沒有 Z 或 +），則視為 UTC
+  let dateStr = timeStr;
+  if (!dateStr.endsWith("Z") && !dateStr.includes("+")) {
+    dateStr += "Z";
+  }
+
+  try {
+    return new Date(dateStr).toLocaleString();
+  } catch (e) {
+    console.error("時間格式化錯誤:", e);
+    return timeStr;
+  }
+};
+
 
 export function DetectionAnalysisOriginal() {
   console.log("DetectionAnalysisOriginal 開始渲染");
@@ -127,7 +144,7 @@ export function DetectionAnalysisOriginal() {
   const [uploadResult, setUploadResult] = useState<VideoUploadResponse | null>(null);
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.5);
   const [selectedVideo, setSelectedVideo] = useState<VideoFileInfo | null>(null);
-  
+
   // 即時分析相關狀態
   const [selectedCamera, setSelectedCamera] = useState<string>("");
   const [realtimeModel, setRealtimeModel] = useState<string>("");
@@ -269,7 +286,7 @@ export function DetectionAnalysisOriginal() {
     error: tasksError,
     refetch: refetchTasks,
   } = useAnalysisTasks(undefined, undefined, 50, 2000);
-  
+
   // 獲取運行中的任務
   const runningTasks = allTasksData?.tasks || [];
 
@@ -326,22 +343,22 @@ export function DetectionAnalysisOriginal() {
         const totalLineIn =
           ensureNumeric(
             lineStatsRecord?.in ??
-              lineStatsRecord?.enter ??
-              stats.line_total_in ??
-              extraRecord?.line_total_in
+            lineStatsRecord?.enter ??
+            stats.line_total_in ??
+            extraRecord?.line_total_in
           ) || lineOptions.reduce((sum, option) => sum + option.in, 0);
         const totalLineOut =
           ensureNumeric(
             lineStatsRecord?.out ??
-              lineStatsRecord?.leave ??
-              stats.line_total_out ??
-              extraRecord?.line_total_out
+            lineStatsRecord?.leave ??
+            stats.line_total_out ??
+            extraRecord?.line_total_out
           ) || lineOptions.reduce((sum, option) => sum + option.out, 0);
         const totalZoneCurrent =
           ensureNumeric(
             zoneStatsRecord?.current ??
-              zoneStatsRecord?.count ??
-              extraRecord?.zone_total_current
+            zoneStatsRecord?.count ??
+            extraRecord?.zone_total_current
           ) || zoneOptionsWithRaw.reduce((sum, option) => sum + option.current, 0);
         const avgSource =
           zoneStatsRecord?.avg ??
@@ -460,8 +477,8 @@ export function DetectionAnalysisOriginal() {
         const prefix = rule.rule_type === "zoneDwell" ? "zone" : "line";
         const selections = availableItems.length
           ? availableItems.map(
-              (item, index) => item.id || `${rule.id}-${prefix}-${index + 1}`
-            )
+            (item, index) => item.id || `${rule.id}-${prefix}-${index + 1}`
+          )
           : [];
         taskBindings[rule.id] = {
           enabled: true,
@@ -625,7 +642,7 @@ export function DetectionAnalysisOriginal() {
       camera: "攝影機01",
       timestamp: "2024-01-15 14:30:25",
       duration: "2:15",
-      fileSize: "15.2MB", 
+      fileSize: "15.2MB",
       resolution: "1920x1080",
       detections: [
         { class: "person", count: 3, confidence: 0.92 },
@@ -710,7 +727,7 @@ export function DetectionAnalysisOriginal() {
     const confirmed = window.confirm(
       `確定要刪除任務「${taskName}」嗎？\n\n此操作將會：\n- 刪除任務記錄\n- 刪除所有相關的檢測結果\n- 此操作無法復原`
     );
-    
+
     if (!confirmed) {
       return;
     }
@@ -739,7 +756,7 @@ export function DetectionAnalysisOriginal() {
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     setIsDragging(false);
-    
+
     const files = event.dataTransfer.files;
     if (files.length > 0) {
       const file = files[0];
@@ -859,7 +876,7 @@ export function DetectionAnalysisOriginal() {
   const handleStartAnalysis = async (video?: VideoFileInfo) => {
     // 優先使用傳入的video參數，其次使用selectedVideo，最後使用uploadResult
     const targetVideo = video || selectedVideo;
-    
+
     if (!targetVideo && !uploadResult) {
       alert('請先選擇或上傳影片檔案');
       return;
@@ -873,7 +890,7 @@ export function DetectionAnalysisOriginal() {
     try {
       // 使用新的影片分析 API，透過 FormData 傳送參數
       const formData = new FormData();
-      
+
       if (targetVideo) {
         // 從影片列表中選擇的影片
         formData.append('file_path', targetVideo.file_path);
@@ -881,7 +898,7 @@ export function DetectionAnalysisOriginal() {
         // 新上傳的影片
         formData.append('file_path', uploadResult.file_path);
       }
-      
+
       // 新增三個必要欄位
       formData.append('task_name', `影片分析_${new Date().toLocaleString()}`);
       formData.append('model_id', selectedModel);
@@ -893,16 +910,16 @@ export function DetectionAnalysisOriginal() {
         confidence_threshold: confidenceThreshold,
         target_video: targetVideo?.name || uploadResult?.original_name
       });
-      
+
       // 使用新的影片分析 API
       const result = await videoAnalysisMutation.mutateAsync(formData);
       console.log('影片分析已開始:', result);
-      
+
       alert(`影片分析已開始執行！\n任務 ID: ${result.task_id}\n狀態: ${result.success ? '成功' : '失敗'}\n${result.message}`);
-      
+
       // 重新載入影片列表以更新狀態
       refetchVideoList();
-      
+
     } catch (error) {
       console.error('創建並執行分析任務失敗:', error);
       alert('創建並執行分析任務失敗，請稍後重試');
@@ -919,15 +936,15 @@ export function DetectionAnalysisOriginal() {
 
     try {
       console.log('刪除影片:', video.id);
-      
+
       const result = await deleteVideoMutation.mutateAsync(video.id);
       console.log('影片刪除成功:', result);
-      
+
       alert(`影片「${video.name}」已成功刪除`);
-      
+
       // 重新載入影片列表
       refetchVideoList();
-      
+
     } catch (error) {
       console.error('刪除影片失敗:', error);
       alert('刪除影片失敗，請稍後重試');
@@ -1050,8 +1067,8 @@ export function DetectionAnalysisOriginal() {
       <div className="flex items-center justify-between">
         <h1>檢測分析</h1>
         <div className="flex gap-2">
-          
-          
+
+
         </div>
       </div>
 
@@ -1076,10 +1093,9 @@ export function DetectionAnalysisOriginal() {
               <CardContent className="space-y-4">
                 <div>
                   <Label htmlFor="video-file">選擇影片檔案</Label>
-                  <div 
-                    className={`border-2 border-dashed rounded-lg p-8 text-center mt-2 transition-colors ${
-                      isDragging ? 'border-primary bg-primary/10' : 'border-border'
-                    }`}
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-8 text-center mt-2 transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-border'
+                      }`}
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -1119,8 +1135,8 @@ export function DetectionAnalysisOriginal() {
                       onChange={handleFileSelect}
                       className="hidden"
                     />
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="mt-4"
                       onClick={() => document.getElementById('video-file')?.click()}
                     >
@@ -1132,7 +1148,7 @@ export function DetectionAnalysisOriginal() {
 
                 {/* 上傳按鈕 */}
                 {selectedFile && !uploadResult ? (
-                  <Button 
+                  <Button
                     onClick={handleUpload}
                     disabled={uploadVideoMutation.isPending}
                     className="w-full"
@@ -1142,8 +1158,8 @@ export function DetectionAnalysisOriginal() {
                   </Button>
                 ) : uploadResult ? (
                   <div className="space-y-3">
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       variant="outline"
                       onClick={() => {
                         setSelectedFile(null);
@@ -1162,8 +1178,8 @@ export function DetectionAnalysisOriginal() {
                     </Button>
                   </div>
                 ) : (
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     disabled={true}
                     variant="outline"
                   >
@@ -1192,8 +1208,8 @@ export function DetectionAnalysisOriginal() {
                 <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
                   <div>
                     <Label htmlFor="detection-model">偵測模型</Label>
-                    <Select 
-                      value={selectedModel} 
+                    <Select
+                      value={selectedModel}
                       onValueChange={(value: string) => {
                         if (value !== "no-models") {
                           setSelectedModel(value);
@@ -1243,8 +1259,8 @@ export function DetectionAnalysisOriginal() {
                     </div>
                   ) : videoListData && videoListData.videos.length > 0 ? (
                     videoListData.videos.map((video: VideoFileInfo) => (
-                      <div 
-                        key={video.id} 
+                      <div
+                        key={video.id}
                         className="border rounded-lg p-3 hover:bg-muted/30 transition-colors cursor-pointer"
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -1270,7 +1286,7 @@ export function DetectionAnalysisOriginal() {
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
                           <div className="flex gap-3">
                             <span>時長: {video.duration || '未知'}</span>
@@ -1281,8 +1297,8 @@ export function DetectionAnalysisOriginal() {
 
                         {video.status === 'ready' && (
                           <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               className="flex-1"
                               disabled={!selectedModel}
                               onClick={() => handleStartAnalysis(video)}
@@ -1301,7 +1317,7 @@ export function DetectionAnalysisOriginal() {
                             </Button>
                           </div>
                         )}
-                        
+
                         {video.status === 'analyzing' && (
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs">
@@ -1321,7 +1337,7 @@ export function DetectionAnalysisOriginal() {
                             </div>
                           </div>
                         )}
-                        
+
                         {video.status === 'completed' && (
                           <div className="space-y-2">
                             <div className="text-center py-2">
@@ -1485,31 +1501,31 @@ export function DetectionAnalysisOriginal() {
                           const hasLineOptions = lineOptions.length > 0;
                           const activeLineSelection =
                             hasLineOptions &&
-                            storedLineSelection &&
-                            lineOptions.some((option) => option.id === storedLineSelection)
+                              storedLineSelection &&
+                              lineOptions.some((option) => option.id === storedLineSelection)
                               ? storedLineSelection
                               : hasLineOptions
-                              ? lineOptions[0].id
-                              : undefined;
+                                ? lineOptions[0].id
+                                : undefined;
                           const displayedLine =
                             hasLineOptions && activeLineSelection
                               ? lineOptions.find((option) => option.id === activeLineSelection) ??
-                                task.crossingLine.summary
+                              task.crossingLine.summary
                               : task.crossingLine.summary;
                           const storedZoneSelection = zoneSelectionByTask[taskKey];
                           const hasZoneOptions = zoneOptions.length > 0;
                           const activeZoneSelection =
                             hasZoneOptions &&
-                            storedZoneSelection &&
-                            zoneOptions.some((option) => option.id === storedZoneSelection)
+                              storedZoneSelection &&
+                              zoneOptions.some((option) => option.id === storedZoneSelection)
                               ? storedZoneSelection
                               : hasZoneOptions
-                              ? zoneOptions[0].id
-                              : undefined;
+                                ? zoneOptions[0].id
+                                : undefined;
                           const displayedZone =
                             hasZoneOptions && activeZoneSelection
                               ? zoneOptions.find((option) => option.id === activeZoneSelection) ??
-                                task.dwellArea.summary
+                              task.dwellArea.summary
                               : task.dwellArea.summary;
 
                           return (
@@ -1681,8 +1697,8 @@ export function DetectionAnalysisOriginal() {
                               rule.rule_type === "lineCrossing"
                                 ? taskRegionData?.lines ?? []
                                 : rule.rule_type === "zoneDwell"
-                                ? taskRegionData?.zones ?? []
-                                : [];
+                                  ? taskRegionData?.zones ?? []
+                                  : [];
                             const requiresGeometry =
                               rule.rule_type === "lineCrossing" || rule.rule_type === "zoneDwell";
                             const selectionLabel =
@@ -1723,8 +1739,7 @@ export function DetectionAnalysisOriginal() {
                                     {selectionItems.map((item, index) => {
                                       const itemId =
                                         item.id ||
-                                        `${rule.id}-${rule.rule_type === "lineCrossing" ? "line" : "zone"}-${
-                                          index + 1
+                                        `${rule.id}-${rule.rule_type === "lineCrossing" ? "line" : "zone"}-${index + 1
                                         }`;
                                       const label =
                                         item.label ||
@@ -1826,7 +1841,7 @@ export function DetectionAnalysisOriginal() {
                           <div className="flex items-center gap-1 mt-1">
                             <Clock className="h-3 w-3 text-muted-foreground" />
                             <span className="text-sm">
-                              {task.start_time ? new Date(task.start_time).toLocaleString() : '未開始'}
+                              {task.start_time ? formatUTCTime(task.start_time) : '未開始'}
                             </span>
                           </div>
                         </div>
@@ -1839,8 +1854,8 @@ export function DetectionAnalysisOriginal() {
                         <div>
                           <p className="text-sm text-muted-foreground">來源解析度</p>
                           <p className="text-lg font-medium">
-                            {task.source_width && task.source_height ? 
-                              `${task.source_width}x${task.source_height}` : 
+                            {task.source_width && task.source_height ?
+                              `${task.source_width}x${task.source_height}` :
                               '未知'
                             }
                           </p>
@@ -1848,8 +1863,8 @@ export function DetectionAnalysisOriginal() {
                         <div>
                           <p className="text-sm text-muted-foreground">信心度閾值</p>
                           <p className="text-lg font-medium">
-                            {task.confidence_threshold ? 
-                              `${Math.round(task.confidence_threshold * 100)}%` : 
+                            {task.confidence_threshold ?
+                              `${Math.round(task.confidence_threshold * 100)}%` :
                               '50%'
                             }
                           </p>
@@ -1859,8 +1874,8 @@ export function DetectionAnalysisOriginal() {
                       <div className="flex justify-end gap-2">
                         {/* 暫停/恢復按鈕 - 只對運行中或暫停的任務顯示 */}
                         {(task.status === 'running' || task.status === 'paused') && (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => toggleTaskStatus(task.id.toString())}
                           >
@@ -1877,11 +1892,11 @@ export function DetectionAnalysisOriginal() {
                             )}
                           </Button>
                         )}
-                        
+
                         {/* 停止按鈕 - 只對運行中或暫停的任務顯示 */}
                         {(task.status === 'running' || task.status === 'paused') && (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="destructive"
                             onClick={() => stopTask(task.id.toString())}
                             disabled={stopTaskMutation.isPending}
@@ -1890,11 +1905,11 @@ export function DetectionAnalysisOriginal() {
                             {stopTaskMutation.isPending ? '停止中...' : '停止'}
                           </Button>
                         )}
-                        
+
                         {/* 刪除按鈕 - 只對非運行狀態的任務顯示 */}
                         {task.status !== 'running' && (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="destructive"
                             onClick={() => deleteTask(task.id.toString(), task.task_name || `任務 #${task.id}`)}
                             disabled={deleteTaskMutation.isPending}
@@ -1936,8 +1951,8 @@ export function DetectionAnalysisOriginal() {
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-purple-600">
-                      {runningTasks.length > 0 
-                        ? Math.round(runningTasks.reduce((sum, task) => sum + (task.source_fps || 30), 0) / runningTasks.length) 
+                      {runningTasks.length > 0
+                        ? Math.round(runningTasks.reduce((sum, task) => sum + (task.source_fps || 30), 0) / runningTasks.length)
                         : 0}
                     </p>
                     <p className="text-sm text-muted-foreground">平均來源 FPS</p>
@@ -1956,7 +1971,7 @@ export function DetectionAnalysisOriginal() {
                 <p>載入模型中...</p>
               </div>
             )}
-            
+
             {modelsError && (
               <div className="text-center py-8 text-red-500">
                 <p>載入錯誤: {modelsError.message}</p>
@@ -1965,7 +1980,7 @@ export function DetectionAnalysisOriginal() {
                 </Button>
               </div>
             )}
-            
+
             {yoloModels && (
               <div className="grid gap-4">
                 {yoloModels.map((model) => {
@@ -2013,8 +2028,8 @@ export function DetectionAnalysisOriginal() {
                         </div>
 
                         <div className="flex justify-end gap-2 mt-6">
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant={isActive ? "outline" : "default"}
                             onClick={() => handleToggleModelStatus(model.id)}
                             disabled={toggleModelMutation.isPending}
@@ -2044,7 +2059,7 @@ export function DetectionAnalysisOriginal() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  
+
 
                   <div>
                     <Label>模型文件</Label>
@@ -2112,7 +2127,7 @@ export function DetectionAnalysisOriginal() {
               </CardContent>
             </Card>
 
-            
+
           </div>
         </TabsContent>
       </Tabs>

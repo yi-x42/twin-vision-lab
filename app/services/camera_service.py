@@ -548,6 +548,10 @@ class CameraService:
                     camera = self._convert_datasource_to_camera(source)
                     if camera:
                         self.cameras[camera.id] = camera
+                    if camera:
+                        self.cameras[camera.id] = camera
+                        config_str = f"Index: {camera.device_index}" if camera.camera_type == 'USB' else f"RTSP: {camera.rtsp_url}"
+                        api_logger.info(f"從資料庫載入攝影機: {camera.name} (ID: {camera.id}, {config_str})")
                 
                 # 不自動初始化預設攝影機，讓用戶手動添加真實設備
                 if not camera_sources:
@@ -809,7 +813,9 @@ class CameraService:
                 )
                 
                 self.cameras[camera_id] = camera
+                self.cameras[camera_id] = camera
                 api_logger.info(f"新增攝影機到資料庫: {name} (ID: {camera_id})")
+                api_logger.info(f"目前內存中的攝影機列表: {list(self.cameras.keys())}")
                 
                 return camera_id
             
@@ -833,13 +839,20 @@ class CameraService:
                 ).first()
                 
                 if source:
+                    api_logger.info(f"資料庫中找到對應記錄: {source.name} (ID: {source.id}) Config: {source.config}")
+                    if source.name != camera_name:
+                        api_logger.warning(f"⚠️ 警告: 內存名稱 ({camera_name}) 與資料庫名稱 ({source.name}) 不一致！")
+                    
                     db.delete(source)
                     db.commit()
                     api_logger.info(f"從資料庫刪除攝影機: {camera_name} (ID: {camera_id})")
+                else:
+                    api_logger.warning(f"⚠️ 警告: 資料庫中找不到 ID 為 {camera_id} 的攝影機記錄！")
             
             # 從內存中刪除
             del self.cameras[camera_id]
             api_logger.info(f"從內存移除攝影機: {camera_name} (ID: {camera_id})")
+            api_logger.info(f"剩餘攝影機列表: {list(self.cameras.keys())}")
                 
         except Exception as e:
             api_logger.error(f"移除攝影機失敗: {e}")

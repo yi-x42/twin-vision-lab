@@ -1,0 +1,28 @@
+--- Match at line 256 ---
+2025-11-27 23:44:56,944 - yolo_system.api - INFO - ✅ 攝影機 USB Camera 0 即時狀態更新為: offline
+2025-11-27 23:44:56,945 - app.websocket.manager - INFO - 📡 全域廣播完成，活躍連線: 0
+2025-11-27 23:44:56,949 - yolo_system.api - INFO - 資料庫中找到對應記錄: USB Camera 0 (ID: 14)
+2025-11-27 23:44:56,962 - yolo_system.api - INFO - 從資料庫刪除攝影機: USB Camera 0 (ID: 14)
+2025-11-27 23:44:56,963 - yolo_system.api - INFO - 從內存移除攝影機: USB Camera 0 (ID: 14)
+
+--- Match at line 257 ---
+2025-11-27 23:44:56,945 - app.websocket.manager - INFO - 📡 全域廣播完成，活躍連線: 0
+2025-11-27 23:44:56,949 - yolo_system.api - INFO - 資料庫中找到對應記錄: USB Camera 0 (ID: 14)
+2025-11-27 23:44:56,962 - yolo_system.api - INFO - 從資料庫刪除攝影機: USB Camera 0 (ID: 14)
+2025-11-27 23:44:56,963 - yolo_system.api - INFO - 從內存移除攝影機: USB Camera 0 (ID: 14)
+2025-11-27 23:44:56,963 - yolo_system.api - INFO - 剩餘攝影機列表: ['15']
+
+--- Match at line 518 ---
+2025-11-27 23:45:29,989 - app.websocket.manager - INFO - 📡 全域廣播完成，活躍連線: 0
+2025-11-27 23:45:30,584 - yolo_system.api - INFO - API - OPTIONS /api/v1/frontend/cameras/15 [200] 0.000s
+2025-11-27 23:45:30,588 - yolo_system.api - INFO - 資料庫中找到對應記錄: USB Camera 1 (ID: 15)
+2025-11-27 23:45:30,596 - yolo_system.api - INFO - 從資料庫刪除攝影機: USB Camera 1 (ID: 15)
+2025-11-27 23:45:30,596 - yolo_system.api - INFO - 從內存移除攝影機: USB Camera 1 (ID: 15)
+
+--- Match at line 519 ---
+2025-11-27 23:45:30,584 - yolo_system.api - INFO - API - OPTIONS /api/v1/frontend/cameras/15 [200] 0.000s
+2025-11-27 23:45:30,588 - yolo_system.api - INFO - 資料庫中找到對應記錄: USB Camera 1 (ID: 15)
+2025-11-27 23:45:30,596 - yolo_system.api - INFO - 從資料庫刪除攝影機: USB Camera 1 (ID: 15)
+2025-11-27 23:45:30,596 - yolo_system.api - INFO - 從內存移除攝影機: USB Camera 1 (ID: 15)
+2025-11-27 23:45:30,597 - yolo_system.api - INFO - 剩餘攝影機列表: []
+

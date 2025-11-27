@@ -334,12 +334,12 @@ export function CameraControl() {
     !pageActive
       ? "目前不在攝影機控制中心，預覽已暫停"
       : activeTab !== "live-view"
-      ? "回到「即時監控」頁面即可再次啟動預覽"
-      : !pageVisible
-      ? "頁面不在前景，預覽已暫停"
-      : !previewInView
-      ? "預覽區域不在視窗內，捲動回來即可恢復"
-      : null;
+        ? "回到「即時監控」頁面即可再次啟動預覽"
+        : !pageVisible
+          ? "頁面不在前景，預覽已暫停"
+          : !previewInView
+            ? "預覽區域不在視窗內，捲動回來即可恢復"
+            : null;
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -457,16 +457,18 @@ export function CameraControl() {
       }
     }
 
-    if (numericIndex === undefined) {
-      numericIndex = index;
-    }
+    // 移除 fallback 到列表索引的邏輯，避免混淆
+    // if (numericIndex === undefined) {
+    //   numericIndex = index;
+    // }
 
     let targetDevice: MediaDeviceInfo | undefined;
-    if (videoDevices.length) {
-      const boundedIndex =
-        ((numericIndex % videoDevices.length) + videoDevices.length) %
-        videoDevices.length;
-      targetDevice = videoDevices[boundedIndex];
+    if (videoDevices.length && numericIndex !== undefined) {
+      // 使用嚴格匹配，不要用取模運算 (modulo)
+      // 如果設備索引超出範圍，就不顯示影像，而不是顯示錯誤的影像
+      if (numericIndex >= 0 && numericIndex < videoDevices.length) {
+        targetDevice = videoDevices[numericIndex];
+      }
     }
 
     const finalDeviceId = targetDevice?.deviceId || explicitDeviceId;
@@ -526,7 +528,7 @@ export function CameraControl() {
 
   // 使用真實的攝影機掃描 API
   const scanCamerasMutation = useScanCameras();
-  
+
   // 刪除攝影機的 mutation
   const deleteCameraMutation = useDeleteCamera();
 
@@ -547,7 +549,7 @@ export function CameraControl() {
 
     // 同時執行進度動畫和真實掃描
     const progressPromise = progressAnimation();
-    
+
     try {
       // 呼叫真實的攝影機掃描 API
       const scanResult = await scanCamerasMutation.mutateAsync({
@@ -574,14 +576,14 @@ export function CameraControl() {
       setScanResults(formattedResults);
       await refetchCameras();
       setShowScanResults(true);
-      
+
     } catch (error) {
       console.error('攝影機掃描失敗:', error);
-      
+
       // 即使失敗也要完成進度動畫
       await progressPromise;
       setScanProgress(100);
-      
+
       // 顯示錯誤訊息
       setScanResults([{
         id: "error",
@@ -704,8 +706,8 @@ export function CameraControl() {
                   <p className="text-xs text-muted-foreground">
                     掃描範圍: {scanConfig.ipRange} | 端口: {scanConfig.ports}
                   </p>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       setIsScanning(false);
                       setScanProgress(0);
@@ -718,58 +720,58 @@ export function CameraControl() {
                 </div>
               ) : showScanResults ? (
                 <>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3>掃描結果</h3>
-                        <Badge variant="outline">{newlyRegisteredCount} 個新設備</Badge>
-                      </div>
-                      
-                      <div className="max-h-96 overflow-auto border rounded-lg">
-                        <div className="space-y-3 p-4">
-                          {scanResults.length === 0 ? (
-                            <div className="text-center text-sm text-muted-foreground py-10">
-                              沒有新的設備需要新增
-                            </div>
-                          ) : (
-                            scanResults.map((device) => (
-                              <div key={device.id} className="border rounded-lg p-4 space-y-3">
-                                <div className="flex items-start justify-between">
-                                  <div className="space-y-1 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="text-sm">{device.name}</h4>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {device.deviceIndex !== undefined
-                                          ? `本機攝影機 #${device.deviceIndex}`
-                                          : "未知設備"}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                      解析度: {device.resolution} | FPS: {device.fps ? device.fps : "未知"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {device.details ?? "已自動加入設備列表"}
-                                    </p>
-                                  </div>
-                                  {device.status === "error" ? (
-                                    <Badge variant="destructive" className="text-xs">
-                                      失敗
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="default" className="text-xs">
-                                      已新增
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3>掃描結果</h3>
+                      <Badge variant="outline">{newlyRegisteredCount} 個新設備</Badge>
                     </div>
 
+                    <div className="max-h-96 overflow-auto border rounded-lg">
+                      <div className="space-y-3 p-4">
+                        {scanResults.length === 0 ? (
+                          <div className="text-center text-sm text-muted-foreground py-10">
+                            沒有新的設備需要新增
+                          </div>
+                        ) : (
+                          scanResults.map((device) => (
+                            <div key={device.id} className="border rounded-lg p-4 space-y-3">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm">{device.name}</h4>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {device.deviceIndex !== undefined
+                                        ? `本機攝影機 #${device.deviceIndex}`
+                                        : "未知設備"}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    解析度: {device.resolution} | FPS: {device.fps ? device.fps : "未知"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {device.details ?? "已自動加入設備列表"}
+                                  </p>
+                                </div>
+                                {device.status === "error" ? (
+                                  <Badge variant="destructive" className="text-xs">
+                                    失敗
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="default" className="text-xs">
+                                    已新增
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         setShowScanResults(false);
                         setScanResults([]);
@@ -830,7 +832,7 @@ export function CameraControl() {
         <TabsList>
           <TabsTrigger value="device-list">設備列表</TabsTrigger>
           <TabsTrigger value="live-view">即時監控</TabsTrigger>
-          
+
         </TabsList>
 
         <TabsContent value="device-list">
@@ -875,25 +877,25 @@ export function CameraControl() {
                   </div>
                   <div className="flex items-center justify-between mt-4">
                     <div className="flex items-center gap-4">
-                      
-                      
-                      
+
+
+
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => openEditDialog(camera)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleDeleteCamera(camera.id)}
                         disabled={deleteCameraMutation.isPending}
                         className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    
+
                       <Button variant="outline" size="sm" onClick={() => startLivePreview(camera.id)}>
                         <MonitorPlay className="h-4 w-4" />
                       </Button>
@@ -940,7 +942,7 @@ export function CameraControl() {
                     </div>
                   )}
                 </div>
-                
+
               </CardContent>
             </Card>
 
@@ -967,11 +969,10 @@ export function CameraControl() {
                               value={camera.id?.toString() ?? `${camera.list_index ?? index}`}
                             >
                               <div className="flex items-center gap-2">
-                                <div 
-                                  className={`w-2 h-2 rounded-full ${
-                                    camera.status === 'active' ? 'bg-green-500' : 
-                                    camera.status === 'inactive' ? 'bg-gray-400' : 'bg-red-500'
-                                  }`}
+                                <div
+                                  className={`w-2 h-2 rounded-full ${camera.status === 'active' ? 'bg-green-500' :
+                                      camera.status === 'inactive' ? 'bg-gray-400' : 'bg-red-500'
+                                    }`}
                                 />
                                 {camera.name}
                               </div>
@@ -1046,13 +1047,13 @@ export function CameraControl() {
                 </CardContent>
               </Card>
 
-              
+
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="settings">
-          
+
         </TabsContent>
       </Tabs>
     </div>

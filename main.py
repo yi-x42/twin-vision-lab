@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 from app.core.config import get_settings
-from app.core.logger import main_logger, api_logger
+from app.core.logger import main_logger, api_logger, setup_logging
 from app.core.database import engine, get_db
 from app.models.database import Base
 
@@ -56,13 +56,13 @@ from app.services.camera_status_monitor import get_camera_monitor
 async def lifespan(app: FastAPI):
     """應用程式生命週期管理"""
     # 啟動時
+    setup_logging()  # 初始化日誌系統
     settings = get_settings()
     main_logger.info(f"啟動 {settings.app_name} v{settings.app_version}")
     
     # 抑制 ultralytics 的詳細輸出
     import logging
     ultralytics_logger = logging.getLogger('ultralytics')
-    ultralytics_logger.setLevel(logging.WARNING)  # 只顯示警告和錯誤
     main_logger.info("✅ 已設置 ultralytics 日誌級別為 WARNING")
     
     # 初始化全域異步隊列管理器
