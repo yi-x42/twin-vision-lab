@@ -8,7 +8,7 @@ import asyncio
 import threading
 import time
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, Set
 from dataclasses import dataclass
 from pathlib import Path
@@ -299,7 +299,7 @@ class RealtimeDetectionService:
 
         frame_data = FrameData(
             frame=frame,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             frame_number=session.frame_count + 1,
             camera_id=session.camera_id,
         )

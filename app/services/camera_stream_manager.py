@@ -7,7 +7,7 @@ import asyncio
 import cv2
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Callable, Optional, Tuple, Any, Set
 from dataclasses import dataclass
 import numpy as np
@@ -223,7 +223,7 @@ class CameraStream:
                 # 創建框架數據
                 frame_data = FrameData(
                     frame=frame.copy(),
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     frame_number=self.frame_count,
                     camera_id=self.camera_id
                 )

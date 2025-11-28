@@ -4,7 +4,7 @@
 """
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update, delete, func, and_, or_
 from sqlalchemy.orm import selectinload
@@ -97,7 +97,7 @@ class DatabaseService:
             for detection in detections:
                 detection_data = {
                     "analysis_id": analysis_id,
-                    "frame_timestamp": datetime.utcnow(),
+                    "frame_timestamp": datetime.now(timezone.utc),
                     **detection
                 }
                 detection_records.append(DetectionResult(**detection_data))

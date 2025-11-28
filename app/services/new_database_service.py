@@ -21,11 +21,15 @@ class DatabaseService:
     
     def __init__(self, db_session: AsyncSession = None):
         self.db = db_session
-        # 將本地時區緩存起來，後續統一轉成 UTC 再寫入資料庫
+        # 將本地時區緩存起來，統一轉 UTC 寫入 TIMESTAMPTZ
         self._local_tz = datetime.now().astimezone().tzinfo or timezone.utc
 
     def _normalize_timestamp(self, value: Any) -> datetime:
-        """確保時間戳含有時區並轉成 UTC，避免 DB 預設 UTC 時造成 8 小時偏移"""
+        """
+        將時間戳轉為 UTC（含 tzinfo）寫入 TIMESTAMPTZ。
+        - 若傳入含時區，轉 UTC
+        - 若無時區，補上本地時區後再轉 UTC
+        """
         try:
             if value is None:
                 return datetime.now(timezone.utc)
@@ -35,7 +39,7 @@ class DatabaseService:
                 value = value.replace(tzinfo=self._local_tz)
             return value.astimezone(timezone.utc)
         except Exception as e:
-            db_logger.warning(f"時間戳正規化失敗，改用當前 UTC 時間: {e}")
+            db_logger.warning(f"時間戳正規化失敗，改用 UTC: {e}")
             return datetime.now(timezone.utc)
     
     # ============================================================================
@@ -334,7 +338,7 @@ class DatabaseService:
             name=source_data['name'],
             config=source_data.get('config'),
             status=source_data.get('status', 'active'),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc)  # 統一使用 UTC 時間
         )
         session.add(source)
         await session.commit()
@@ -374,7 +378,7 @@ class DatabaseService:
                 .where(DataSource.id == source_id)
                 .values(
                     status=status,
-                    last_check=datetime.now(timezone.utc)
+                    last_check=datetime.now(timezone.utc)  # 統一使用 UTC 時間
                 )
             )
             await session.commit()

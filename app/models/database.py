@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from app.core.config import settings
 import json
 
 from sqlalchemy import (
@@ -30,6 +32,16 @@ def _safe_iso(value):
     if isinstance(value, str):
         return value
     if hasattr(value, "isoformat"):
+        try:
+            display_tz = ZoneInfo(getattr(settings, "alert_display_timezone", "UTC"))
+        except Exception:
+            display_tz = None
+
+        if display_tz:
+            if getattr(value, "tzinfo", None):
+                value = value.astimezone(display_tz)
+            else:
+                value = value.replace(tzinfo=display_tz)
         return value.isoformat()
     return str(value)
 
@@ -46,7 +58,7 @@ class AnalysisTask(Base):
     source_fps = Column(Float)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     task_name = Column(String(200))
     camera_id = Column(String(100))
     camera_name = Column(String(200))
@@ -185,7 +197,7 @@ class DetectionResult(Base):
     object_speed = Column(Float)
     zones = Column(JSON)
     frame_number = Column(Integer)
-    frame_timestamp = Column(DateTime, default=datetime.utcnow)
+    frame_timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     object_type = Column(String(50))
     confidence = Column(Float)
     bbox_x1 = Column(Float)
@@ -231,7 +243,7 @@ class LineCrossingEvent(Base):
     line_id = Column(String(50), nullable=False)
     direction = Column(String(20))
     frame_number = Column(Integer)
-    frame_timestamp = Column(DateTime, default=datetime.utcnow)
+    frame_timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     extra = Column(JSON)
 
     task = relationship("AnalysisTask", back_populates="line_events")
@@ -264,7 +276,7 @@ class ZoneDwellEvent(Base):
     exited_at = Column(DateTime)
     dwell_seconds = Column(Float)
     frame_number = Column(Integer)
-    event_timestamp = Column(DateTime, default=datetime.utcnow)
+    event_timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     extra = Column(JSON)
 
     task = relationship("AnalysisTask", back_populates="zone_events")
@@ -298,7 +310,7 @@ class SpeedEvent(Base):
     speed_max = Column(Float)
     threshold = Column(Float)
     frame_number = Column(Integer)
-    event_timestamp = Column(DateTime, default=datetime.utcnow)
+    event_timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     extra = Column(JSON)
 
     task = relationship("AnalysisTask", back_populates="speed_events")
@@ -327,7 +339,7 @@ class DataSource(Base):
     config = Column(JSON)
     status = Column(String(20), nullable=False, default="active")
     last_check = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     analysis_tasks = relationship("AnalysisTask", back_populates="data_source")
 
@@ -352,7 +364,7 @@ class User(Base):
     role = Column(String(20), nullable=False, default="viewer")
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     def to_dict(self):
         return {
@@ -377,8 +389,8 @@ class SystemConfig(Base):
     payload = Column(JSON)
     description = Column(Text)
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     def to_dict(self):
         return {
@@ -402,7 +414,7 @@ class TaskStatistics(Base):
     task_id = Column(
         Integer, ForeignKey("analysis_tasks.id", ondelete="CASCADE"), primary_key=True
     )
-    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     fps = Column(Float)
     person_count = Column(Integer)
     avg_confidence = Column(Float)

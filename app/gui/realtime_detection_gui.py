@@ -22,7 +22,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -1363,7 +1363,7 @@ class DetectionWorker(QtCore.QThread):
         except queue.Empty:
             raise TimeoutError("共享攝影機無影格可用")
         frame = frame_data.frame.copy()
-        timestamp = frame_data.timestamp or datetime.utcnow()
+        timestamp = frame_data.timestamp or datetime.now(timezone.utc)
         return frame, timestamp
 
     def _save_detection_thumbnail(
@@ -1653,7 +1653,7 @@ class DetectionWorker(QtCore.QThread):
             success, frame = capture.read()
             if not success:
                 raise RuntimeError("無法讀取影像來源的第一個影格")
-            frame_timestamp = datetime.utcnow()
+            frame_timestamp = datetime.now(timezone.utc)
 
         model = YOLO(args.model)
         tracker = sv.ByteTrack()
@@ -1685,7 +1685,7 @@ class DetectionWorker(QtCore.QThread):
                         self.statusMessage.emit("影像來源結束或中斷，停止串流")
                         break
                     frame = next_frame
-                    frame_timestamp = datetime.utcnow()
+                    frame_timestamp = datetime.now(timezone.utc)
 
                 current_time = time.perf_counter()
                 elapsed = current_time - last_frame_time
@@ -1733,7 +1733,7 @@ class DetectionWorker(QtCore.QThread):
 
                 self._frame_index += 1
                 frame_number = self._frame_index
-                frame_timestamp = datetime.utcnow()
+                frame_timestamp = datetime.now(timezone.utc)
                 num_detections = len(detections)
                 if num_detections and detections.tracker_id is not None:
                     tracker_ids = [
@@ -1894,7 +1894,7 @@ class DetectionWorker(QtCore.QThread):
                         {
                             "tracker_id": tracker_int,
                             "zone_id": zone_label,
-                            "entered_at": datetime.utcfromtimestamp(entered_at_wall),
+                            "entered_at": datetime.fromtimestamp(entered_at_wall, tz=timezone.utc),
                             "exited_at": frame_timestamp,
                             "dwell_seconds": dwell_seconds,
                             "frame_number": frame_number,
@@ -1941,7 +1941,7 @@ class DetectionWorker(QtCore.QThread):
                                         {
                                             "tracker_id": tracker_int,
                                             "zone_id": zone_state.label,
-                                            "entered_at": datetime.utcfromtimestamp(
+                                            "entered_at": datetime.fromtimestamp(
                                                 entered_at_wall
                                             ),
                                             "dwell_seconds": dwell_seconds_live,
