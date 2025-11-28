@@ -2805,11 +2805,15 @@ async def get_hourly_activity(
 ):
     """取得指定期間內每小時的偵測量，供前端 24 小時活動圖表使用。"""
     try:
-        now = datetime.now()
-        current_hour = now.replace(minute=0, second=0, microsecond=0)
+        display_now = datetime.now(ALERT_DISPLAY_TZ)
+        current_hour_display = display_now.replace(minute=0, second=0, microsecond=0)
         window_hours = max(1, min(hours, 168))
-        start_hour = current_hour - timedelta(hours=window_hours - 1)
-        end_boundary = current_hour + timedelta(hours=1)
+        start_display_hour = current_hour_display - timedelta(hours=window_hours - 1)
+        end_display_boundary = current_hour_display + timedelta(hours=1)
+
+        # 以 UTC 作為查詢邊界，避免時區偏移導致的漏抓/錯位
+        start_boundary_utc = start_display_hour.astimezone(timezone.utc)
+        end_boundary_utc = end_display_boundary.astimezone(timezone.utc)
 
         hour_bucket = func.date_trunc("hour", DetectionResult.frame_timestamp).label("hour_bucket")
         count_expr = func.count(DetectionResult.id).label("count")
@@ -2817,8 +2821,8 @@ async def get_hourly_activity(
         stmt = (
             select(hour_bucket, count_expr)
             .where(
-                DetectionResult.frame_timestamp >= start_hour,
-                DetectionResult.frame_timestamp < end_boundary,
+                DetectionResult.frame_timestamp >= start_boundary_utc,
+                DetectionResult.frame_timestamp < end_boundary_utc,
             )
             .group_by(hour_bucket)
             .order_by(hour_bucket)
@@ -2830,14 +2834,16 @@ async def get_hourly_activity(
             bucket_time = getattr(row, "hour_bucket", None)
             if bucket_time is None:
                 continue
-            if bucket_time.tzinfo is not None:
-                bucket_time = bucket_time.replace(tzinfo=None)
-            aggregated[bucket_time] = int(getattr(row, "count", 0) or 0)
+            # 將資料庫的時區時間戳統一轉為顯示時區，避免圖表座標錯位
+            if bucket_time.tzinfo is None:
+                bucket_time = bucket_time.replace(tzinfo=timezone.utc)
+            bucket_display_time = bucket_time.astimezone(ALERT_DISPLAY_TZ)
+            aggregated[bucket_display_time] = int(getattr(row, "count", 0) or 0)
 
         data_points: List[HourlyActivityPoint] = []
         total_count = 0
         for idx in range(window_hours):
-            bucket_time = start_hour + timedelta(hours=idx)
+            bucket_time = start_display_hour + timedelta(hours=idx)
             count = aggregated.get(bucket_time, 0)
             total_count += count
             label = bucket_time.strftime("%m/%d %H:00")
